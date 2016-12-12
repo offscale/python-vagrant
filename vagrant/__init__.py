@@ -1,4 +1,4 @@
-'''
+"""
 Python bindings for working with Vagrant and Vagrantfiles.  Do useful things
 with the `vagrant` CLI without the boilerplate (and errors) of calling
 `vagrant` and parsing the results.
@@ -8,7 +8,7 @@ including method names and parameter names.
 
 Documentation of usage, testing, installation, etc., can be found at
 https://github.com/todddeluca/python-vagrant.
-'''
+"""
 
 # std
 import collections
@@ -23,14 +23,12 @@ import logging
 # local
 from . import compat
 
-
 # python package version
-# should match r"^__version__ = '(?P<version>[^']+)'$" for setup.py
 __version__ = '0.5.14'
-
-
+# python package author
+__author__ = 'Todd Francis DeLuca'
+__author_email__ = 'todddeluca@yahoo.com'
 log = logging.getLogger(__name__)
-
 
 ###########################################
 # Determine Where The Vagrant Executable Is
@@ -40,7 +38,7 @@ VAGRANT_NOT_FOUND_WARNING = 'The Vagrant executable cannot be found. ' \
 
 
 def which(program):
-    '''
+    """
     Emulate unix 'which' command.  If program is a path to an executable file
     (i.e. it contains any directory components, like './myscript'), return
     program.  Otherwise, if an executable file matching program is found in one
@@ -51,14 +49,27 @@ def which(program):
     extension, include the extensions in PATHEXT when searching for a matching
     executable file.
 
-    Return None if no executable file is found.
-
     http://stackoverflow.com/questions/377017/test-if-executable-exists-in-python/377028#377028
     https://github.com/webcoyote/vagrant/blob/f70507062e3b30c00db1f0d8b90f9245c4c997d4/lib/vagrant/util/file_util.rb
     Python3.3+ implementation:
     https://hg.python.org/cpython/file/default/Lib/shutil.py
-    '''
+
+    :param program: name of program
+    :type program ``str``
+    :return: None if executable not found else program location
+    :rtype: ``str``
+    """
+
     def is_exe(fpath):
+        """
+        Checks if the filepath is an executable
+
+        :keyword fpath: filepath
+        :type fpath: ``str``
+
+        :return: True if executable else False
+        :rtype: ``bool``
+        """
         return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
 
     # Shortcut: If program contains any dir components, do not search the path
@@ -124,14 +135,18 @@ def which(program):
     return None
 
 
-# The full path to the vagrant executable, e.g. '/usr/bin/vagrant'
 def get_vagrant_executable():
+    """
+    The full path to the vagrant executable, e.g. '/usr/bin/vagrant'
+
+    :return: vagrant executable path
+    :rtype: ``str``
+    """
     return which('vagrant')
 
 
 if get_vagrant_executable() is None:
     log.warn(VAGRANT_NOT_FOUND_WARNING)
-
 
 # Classes for listings of Statuses, Boxes, and Plugins
 Status = collections.namedtuple('Status', ['name', 'state', 'provider'])
@@ -145,43 +160,49 @@ Plugin = collections.namedtuple('Plugin', ['name', 'version', 'system'])
 
 @contextlib.contextmanager
 def stdout_cm():
-    ''' Redirect the stdout or stderr of the child process to sys.stdout. '''
+    """ Redirect the stdout or stderr of the child process to sys.stdout. """
     yield sys.stdout
 
 
 @contextlib.contextmanager
 def stderr_cm():
-    ''' Redirect the stdout or stderr of the child process to sys.stderr. '''
+    """ Redirect the stdout or stderr of the child process to sys.stderr. """
     yield sys.stderr
 
 
 @contextlib.contextmanager
 def devnull_cm():
-    ''' Redirect the stdout or stderr of the child process to /dev/null. '''
+    """ Redirect the stdout or stderr of the child process to /dev/null. """
     with open(os.devnull, 'w') as fh:
         yield fh
 
 
 @contextlib.contextmanager
 def none_cm():
-    ''' Use the stdout or stderr file handle of the parent process. '''
+    """ Use the stdout or stderr file handle of the parent process. """
     yield None
 
 
 def make_file_cm(filename, mode='a'):
-    '''
+    """
     Open a file for appending and yield the open filehandle.  Close the 
     filehandle after yielding it.  This is useful for creating a context
     manager for logging the output of a `Vagrant` instance.
-
-    filename: a path to a file
-    mode: The mode in which to open the file.  Defaults to 'a', append
-
     Usage example:
 
         log_cm = make_file_cm('application.log')
         v = Vagrant(out_cm=log_cm, err_cm=log_cm)
-    '''
+
+    :keyword filename: a path to a file
+    :type filename: ``str``
+
+    :keyword mode: The mode in which to open the file.  Defaults to 'a', append
+    :type mode: ``str``
+
+    :return: Open file handler
+    :rtype: ``contextlib.contextmanager`` yielding ``cm``
+    """
+
     @contextlib.contextmanager
     def cm():
         with open(filename, mode=mode) as fh:
@@ -191,13 +212,13 @@ def make_file_cm(filename, mode='a'):
 
 
 class Vagrant(object):
-    '''
+    """
     Object to up (launch) and destroy (terminate) vagrant virtual machines,
     to check the status of the machine and to report on the configuration
     of the machine.
 
     Works by using the `vagrant` executable and a `Vagrantfile`.
-    '''
+    """
 
     # Some machine-readable state values returned by status
     # There are likely some missing, but if you use vagrant you should
@@ -208,31 +229,39 @@ class Vagrant(object):
     NOT_CREATED = 'not_created'  # vagrant destroy
     POWEROFF = 'poweroff'  # vagrant halt
     ABORTED = 'aborted'  # The VM is in an aborted state
-    SAVED = 'saved' # vagrant suspend
+    SAVED = 'saved'  # vagrant suspend
     # LXC statuses
     STOPPED = 'stopped'
     FROZEN = 'frozen'
     # libvirt
     SHUTOFF = 'shutoff'
 
+    # More avail. here: https://atlas.hashicorp.com/boxes/search
     BASE_BOXES = {
         'ubuntu-Lucid32': 'http://files.vagrantup.com/lucid32.box',
         'ubuntu-lucid32': 'http://files.vagrantup.com/lucid32.box',
         'ubuntu-lucid64': 'http://files.vagrantup.com/lucid64.box',
         'ubuntu-precise32': 'http://files.vagrantup.com/precise32.box',
         'ubuntu-precise64': 'http://files.vagrantup.com/precise64.box',
+        'ubuntu-trusty32': 'https://vagrantcloud.com/ubuntu/boxes/trusty32/versions/14.04/providers/virtualbox.box',
+        'ubuntu-trusty64': 'https://vagrantcloud.com/ubuntu/boxes/trusty64/versions/14.04/providers/virtualbox.box'
     }
 
     def __init__(self, root=None, quiet_stdout=True, quiet_stderr=True,
                  env=None, out_cm=None, err_cm=None):
-        '''
-        root: a directory containing a file named Vagrantfile.  Defaults to
-        os.getcwd(). This is the directory and Vagrantfile that the Vagrant
-        instance will operate on.
-        env: a dict of environment variables (string keys and values) passed to
+        """
+
+        :keyword root: a directory containing a file named Vagrantfile
+                              default to ``None`` [os.getcwd()]. If a filepath is given, its dir is resolved.
+                              This is the directory and Vagrantfile that the Vagrant instance will operate on.
+        :type root: ``str``
+
+        :keyword env: environment variables (string keys and values) passed to
           the vagrant command subprocess or None.  Defaults to None.  If env is
           None, `subprocess.Popen` uses the current process environment.
-        out_cm: a no-argument function that returns a ContextManager that
+        :type env: ``dict``
+
+        :keyword out_cm: a no-argument function that returns a ContextManager that
           yields a filehandle or other object suitable to be passed as the
           `stdout` parameter of a subprocess that runs a vagrant command.
           Using a context manager allows one to close the filehandle in case of
@@ -241,19 +270,26 @@ class Vagrant(object):
           how to log stdout to a file.  Note that commands that parse the
           output of a vagrant command, like `status`, capture output for their
           own use, ignoring the value of `out_cm` and `quiet_stdout`.
-        err_cm: a no-argument function that returns a ContextManager, like
+        :type out_cm: ``() -> ContextManager -> File``
+
+        :keyword err_cm: a no-argument function that returns a ContextManager, like
           out_cm, for handling the stderr of the vagrant subprocess.  Defaults
           to none_cm.
-        quiet_stdout: Ignored if out_cm is not None.  If True, the stdout of
+        :type err_cm: ``str``
+
+        :keyword quiet_stdout: Ignored if out_cm is not None.  If True, the stdout of
           vagrant commands whose output is not captured for further processing
           will be sent to devnull.
-        quiet_stderr: Ignored if out_cm is not None.  If True, the stderr of
+        :type quiet_stdout: ``bool``
+
+        :keyword quiet_stderr: Ignored if out_cm is not None.  If True, the stderr of
           vagrant commands whose output is not captured for further processing
           will be sent to devnull.
-        '''
+        :type quiet_stderr: ``bool``
+        """
         self.root = os.path.abspath(root) if root is not None else os.getcwd()
         self._cached_conf = {}
-        self._vagrant_exe = None # cache vagrant executable path
+        self._vagrant_exe = None  # cache vagrant executable path
         self.env = env
         if out_cm is not None:
             self.out_cm = out_cm
@@ -274,9 +310,12 @@ class Vagrant(object):
             self.err_cm = none_cm
 
     def version(self):
-        '''
-        Return the installed vagrant version, as a string, e.g. '1.5.0'
-        '''
+        """
+        Retrieves vagrant version, as a string, e.g. '1.5.0'
+
+        :return: Vagrant version
+        :rtype: ``str``
+        """
         output = self._run_vagrant_command(['--version'])
         m = re.search(r'^Vagrant (?P<version>.+)$', output)
         if m is None:
@@ -284,7 +323,7 @@ class Vagrant(object):
         return m.group('version')
 
     def init(self, box_name=None, box_url=None):
-        '''
+        """
         From the Vagrant docs:
 
         This initializes the current directory to be a Vagrant environment by
@@ -295,23 +334,42 @@ class Vagrant(object):
         If box_url is given, it will prepopulate the config.vm.box_url setting
         in the created Vagrantfile.
 
+        :keyword box_name: Box name
+        :type box_name: ``str``
+
+        :keyword box_url: Box url
+        :type box_url: ``str``
+
         Note: if box_url is given, box_name should also be given.
-        '''
+        """
         self._call_vagrant_command(['init', box_name, box_url])
 
     def up(self, no_provision=False, provider=None, vm_name=None,
            provision=None, provision_with=None):
-        '''
+        """
         Launch the Vagrant box.
-        vm_name=None: name of VM.
-        provision_with: optional list of provisioners to enable.
-        provider: Back the machine with a specific provider
-        no_provision: if True, disable provisioning.  Same as 'provision=False'.
-        provision: optional boolean.  Enable or disable provisioning.  Default
+
+        :keyword no_provision: if True, disable provisioning.  Same as 'provision=False'.
+        :type no_provision: ``bool``
+
+        :keyword provider: Back the machine with a specific provider
+        :type provider: ``str``
+
+        :keyword vm_name: required in a Multi-VM Vagrant environment.  This name will be
+        used to get the configuration for the named vm and associate the config
+        with the vm name in the cache.
+        :type vm_name: ``str``
+
+        :keyword provision: optional boolean.  Enable or disable provisioning.  Default
           behavior is to use the underlying vagrant default.
+        :type provision: ``bool``
+
+        :keyword provision_with: optional list of provisioners to enable.
+        :type provision_with: ``list`` of ``str``
+
         Note: If provision and no_provision are not None, no_provision will be
         ignored.
-        '''
+        """
         provider_arg = '--provider=%s' % provider if provider else None
         prov_with_arg = None if provision_with is None else '--provision-with'
         providers_arg = None if provision_with is None else ','.join(provision_with)
@@ -324,8 +382,8 @@ class Vagrant(object):
         provision_arg = None if provision is None else '--provision' if provision else '--no-provision'
 
         self._call_vagrant_command(['up', vm_name, no_provision_arg,
-                                   provision_arg, provider_arg,
-                                   prov_with_arg, providers_arg])
+                                    provision_arg, provider_arg,
+                                    prov_with_arg, providers_arg])
         try:
             self.conf(vm_name=vm_name)  # cache configuration
         except subprocess.CalledProcessError:
@@ -334,19 +392,27 @@ class Vagrant(object):
             pass
 
     def provision(self, vm_name=None, provision_with=None):
-        '''
+        """
         Runs the provisioners defined in the Vagrantfile.
         vm_name: optional VM name string.
         provision_with: optional list of provisioners to enable.
           e.g. ['shell', 'chef_solo']
-        '''
+
+        :keyword vm_name: required in a Multi-VM Vagrant environment.  This name will be
+        used to get the configuration for the named vm and associate the config
+        with the vm name in the cache.
+        :type vm_name: ``str``
+
+        :keyword provision_with: optional list of provisioners to enable.
+        :type provision_with: ``list`` of ``str``
+        """
         prov_with_arg = None if provision_with is None else '--provision-with'
         providers_arg = None if provision_with is None else ','.join(provision_with)
         self._call_vagrant_command(['provision', vm_name, prov_with_arg,
-                                   providers_arg])
+                                    providers_arg])
 
     def reload(self, vm_name=None, provision=None, provision_with=None):
-        '''
+        """
         Quoting from Vagrant docs:
         > The equivalent of running a halt followed by an up.
 
@@ -354,50 +420,78 @@ class Vagrant(object):
 
         > The configured provisioners will not run again, by default. You can force the provisioners to re-run by specifying the --provision flag.
 
-        provision: optional boolean.  Enable or disable provisioning.  Default
+        :keyword vm_name: required in a Multi-VM Vagrant environment.  This name will be
+        used to get the configuration for the named vm and associate the config
+        with the vm name in the cache.
+        :type vm_name: ``str``
+
+        :keyword provision: optional boolean.  Enable or disable provisioning.  Default
           behavior is to use the underlying vagrant default.
-        provision_with: optional list of provisioners to enable.
-          e.g. ['shell', 'chef_solo']
-        '''
+        :type provision: ``bool``
+
+        :keyword provision_with: optional list of provisioners to enable.
+        :type provision_with: ``list`` of ``str``
+        """
         prov_with_arg = None if provision_with is None else '--provision-with'
         providers_arg = None if provision_with is None else ','.join(provision_with)
         provision_arg = None if provision is None else '--provision' if provision else '--no-provision'
         self._call_vagrant_command(['reload', vm_name, provision_arg,
-                                   prov_with_arg, providers_arg])
+                                    prov_with_arg, providers_arg])
 
     def suspend(self, vm_name=None):
-        '''
+        """
         Suspend/save the machine.
-        '''
+
+        :keyword vm_name: required in a Multi-VM Vagrant environment.  This name will be
+        used to get the configuration for the named vm and associate the config
+        with the vm name in the cache.
+        :type vm_name: ``str``
+        """
         self._call_vagrant_command(['suspend', vm_name])
         self._cached_conf[vm_name] = None  # remove cached configuration
 
     def resume(self, vm_name=None):
-        '''
+        """
         Resume suspended machine.
-        '''
+
+        :keyword vm_name: required in a Multi-VM Vagrant environment.  This name will be
+        used to get the configuration for the named vm and associate the config
+        with the vm name in the cache.
+        :type vm_name: ``str``
+        """
         self._call_vagrant_command(['resume', vm_name])
         self._cached_conf[vm_name] = None  # remove cached configuration
 
     def halt(self, vm_name=None, force=False):
-        '''
+        """
         Halt the Vagrant box.
 
-        force: If True, force shut down.
-        '''
+        :keyword vm_name: required in a Multi-VM Vagrant environment.  This name will be
+        used to get the configuration for the named vm and associate the config
+        with the vm name in the cache.
+        :type vm_name: ``str``
+
+        :keyword force: Setting True will force shut down.
+        :type force: ``bool``
+        """
         force_opt = '--force' if force else None
         self._call_vagrant_command(['halt', vm_name, force_opt])
         self._cached_conf[vm_name] = None  # remove cached configuration
 
     def destroy(self, vm_name=None):
-        '''
+        """
         Terminate the running Vagrant box.
-        '''
+
+        :keyword vm_name: required in a Multi-VM Vagrant environment.  This name will be
+        used to get the configuration for the named vm and associate the config
+        with the vm name in the cache.
+        :type vm_name: ``str``
+        """
         self._call_vagrant_command(['destroy', vm_name, '--force'])
         self._cached_conf[vm_name] = None  # remove cached configuration
 
     def status(self, vm_name=None):
-        '''
+        """
         Return the results of a `vagrant status` call as a list of one or more
         Status objects.  A Status contains the following attributes:
 
@@ -467,16 +561,30 @@ class Vagrant(object):
 
             $ vagrant status --machine-readable
             1424099094,,error-exit,Vagrant::Errors::NoEnvironmentError,A Vagrant environment or target machine is required to run this\ncommand. Run `vagrant init` to create a new Vagrant environment. Or%!(VAGRANT_COMMA)\nget an ID of a target machine from `vagrant global-status` to run\nthis command on. A final option is to change to a directory with a\nVagrantfile and to try again.
-        '''
+
+        :keyword vm_name: required in a Multi-VM Vagrant environment.  This name will be
+        used to get the configuration for the named vm and associate the config
+        with the vm name in the cache.
+        :type vm_name: ``str``
+
+        :return: Parsed output of `vagrant status --machine-readable`
+        :rtype: ``List`` of ``Status``
+        """
         # machine-readable output are CSV lines
         output = self._run_vagrant_command(['status', '--machine-readable', vm_name])
         return self._parse_status(output)
 
     def _parse_status(self, output):
-        '''
+        """
         Unit testing is so much easier when Vagrant is removed from the
         equation.
-        '''
+
+        :keyword output: content to parse
+        :type output: ``str``
+
+        :return: Parsed output of `vagrant status --machine-readable`
+        :rtype: ``List`` of ``Status``
+        """
         parsed = self._parse_machine_readable_output(output)
         statuses = []
         # group tuples by target name
@@ -492,7 +600,7 @@ class Vagrant(object):
         return statuses
 
     def conf(self, ssh_config=None, vm_name=None):
-        '''
+        """
         Parse ssh_config into a dict containing the keys defined in ssh_config,
         which should include these keys (listed with example values): 'User'
         (e.g.  'vagrant'), 'HostName' (e.g. 'localhost'), 'Port' (e.g. '2222'),
@@ -505,14 +613,19 @@ class Vagrant(object):
         an Exception if the Vagrant box has not yet been created or has been
         destroyed.
 
-        vm_name: required in a Multi-VM Vagrant environment.  This name will be
-        used to get the configuration for the named vm and associate the config
-        with the vm name in the cache.
-
-        ssh_config: a valid ssh confige file host section.  Defaults to
+        :keyword ssh_config: a valid ssh config file host section.  Defaults to
         the value returned from ssh_config().  For speed, the configuration
         parsed from ssh_config is cached for subsequent calls.
-        '''
+        :type ssh_config: ``Config``
+
+        :keyword vm_name: required in a Multi-VM Vagrant environment.  This name will be
+        used to get the configuration for the named vm and associate the config
+        with the vm name in the cache.
+        :type vm_name: ``str``
+
+        :return: Parsed output of ssh config
+        :rtype: ``dict``
+        """
         if self._cached_conf.get(vm_name) is None or ssh_config is not None:
             if ssh_config is None:
                 ssh_config = self.ssh_config(vm_name=vm_name)
@@ -522,13 +635,11 @@ class Vagrant(object):
         return self._cached_conf[vm_name]
 
     def ssh_config(self, vm_name=None):
-        '''
+        """
         Return the output of 'vagrant ssh-config' which appears to be a valid
         Host section suitable for use in an ssh config file.
         Raises an Exception if the Vagrant box has not yet been created or
         has been destroyed.
-
-        vm_name: required in a multi-VM environment.
 
         Example output:
             Host default
@@ -540,42 +651,74 @@ class Vagrant(object):
                 PasswordAuthentication no
                 IdentityFile /Users/todd/.vagrant.d/insecure_private_key
                 IdentitiesOnly yes
-        '''
+
+        :keyword vm_name: required in a Multi-VM Vagrant environment.  This name will be
+        used to get the configuration for the named vm and associate the config
+        with the vm name in the cache.
+        :type vm_name: ``str``
+
+        :return: Unparsed output of `vagrant ssh-config`
+        :rtype: ``str``
+        """
         # capture ssh configuration from vagrant
         return self._run_vagrant_command(['ssh-config', vm_name])
 
     def user(self, vm_name=None):
-        '''
+        """
         Return the ssh user of the vagrant box, e.g. 'vagrant'
         or None if there is no user in the ssh_config.
 
         Raises an Exception if the Vagrant box has not yet been created or
         has been destroyed.
-        '''
+
+        :keyword vm_name: required in a Multi-VM Vagrant environment.  This name will be
+        used to get the configuration for the named vm and associate the config
+        with the vm name in the cache.
+        :type vm_name: ``str``
+
+        :return: ssh user of the vagrant box
+        :rtype: ``str``
+        """
         return self.conf(vm_name=vm_name).get('User')
 
     def hostname(self, vm_name=None):
-        '''
+        """
         Return the vagrant box hostname, e.g. '127.0.0.1'
         or None if there is no hostname in the ssh_config.
 
         Raises an Exception if the Vagrant box has not yet been created or
         has been destroyed.
-        '''
+
+        :keyword vm_name: required in a Multi-VM Vagrant environment.  This name will be
+        used to get the configuration for the named vm and associate the config
+        with the vm name in the cache.
+        :type vm_name: ``str``
+
+        :return: hostname of the vagrant box
+        :rtype: ``str``
+        """
         return self.conf(vm_name=vm_name).get('HostName')
 
     def port(self, vm_name=None):
-        '''
+        """
         Return the vagrant box ssh port, e.g. '2222'
         or None if there is no port in the ssh_config.
 
         Raises an Exception if the Vagrant box has not yet been created or
         has been destroyed.
-        '''
+
+        :keyword vm_name: required in a Multi-VM Vagrant environment.  This name will be
+        used to get the configuration for the named vm and associate the config
+        with the vm name in the cache.
+        :type vm_name: ``str``
+
+        :return: ssh port of the vagrant box
+        :rtype: ``str``
+        """
         return self.conf(vm_name=vm_name).get('Port')
 
     def keyfile(self, vm_name=None):
-        '''
+        """
         Return the path to the private key used to log in to the vagrant box
         or None if there is no keyfile (IdentityFile) in the ssh_config.
         E.g. '/Users/todd/.vagrant.d/insecure_private_key'
@@ -584,11 +727,19 @@ class Vagrant(object):
         has been destroyed.
 
         KeyFile is a synonym for IdentityFile.
-        '''
+
+        :keyword vm_name: required in a Multi-VM Vagrant environment.  This name will be
+        used to get the configuration for the named vm and associate the config
+        with the vm name in the cache.
+        :type vm_name: ``str``
+
+        :return: KeyFile/IdentifyFile of the vagrant box
+        :rtype: ``str``
+        """
         return self.conf(vm_name=vm_name).get('IdentityFile')
 
     def user_hostname(self, vm_name=None):
-        '''
+        """
         Return a string combining user and hostname, e.g. 'vagrant@127.0.0.1'.
         This string is suitable for use in an ssh commmand.  If user is None
         or empty, it will be left out of the string, e.g. 'localhost'.  If
@@ -596,13 +747,21 @@ class Vagrant(object):
 
         Raises an Exception if the Vagrant box has not yet been created or
         has been destroyed.
-        '''
+
+        :keyword vm_name: required in a Multi-VM Vagrant environment.  This name will be
+        used to get the configuration for the named vm and associate the config
+        with the vm name in the cache.
+        :type vm_name: ``str``
+
+        :return: Combined user and hostname ['{user}@{hostname}']
+        :rtype: ``str``
+        """
         user = self.user(vm_name=vm_name)
         user_prefix = user + '@' if user else ''
         return user_prefix + self.hostname(vm_name=vm_name)
 
     def user_hostname_port(self, vm_name=None):
-        '''
+        """
         Return a string combining user, hostname and port, e.g.
         'vagrant@127.0.0.1:2222'.  This string is suitable for use with Fabric,
         in env.hosts.  If user or port is None or empty, they will be left
@@ -612,7 +771,15 @@ class Vagrant(object):
 
         Raises an Exception if the Vagrant box has not yet been created or
         has been destroyed.
-        '''
+
+        :keyword vm_name: required in a Multi-VM Vagrant environment.  This name will be
+        used to get the configuration for the named vm and associate the config
+        with the vm name in the cache.
+        :type vm_name: ``str``
+
+        :return: Combined user, hostname & port ['{user}@{hostname}:{port}']
+        :rtype: ``str``
+        """
         user = self.user(vm_name=vm_name)
         port = self.port(vm_name=vm_name)
         user_prefix = user + '@' if user else ''
@@ -620,11 +787,21 @@ class Vagrant(object):
         return user_prefix + self.hostname(vm_name=vm_name) + port_suffix
 
     def box_add(self, name, url, provider=None, force=False):
-        '''
+        """
         Adds a box with given name, from given url.
 
-        force: If True, overwrite an existing box if it exists.
-        '''
+        :keyword name: Set the name
+        :type name: ``str``
+
+        :keyword url: Set the url
+        :type url: ``str``
+
+        :keyword provider: Back the machine with a specific provider
+        :type provider: ``str``
+
+        :keyword force: optional boolean. If True, overwrite an existing box if it exists.
+        :type force: ``bool``
+        """
         force_opt = '--force' if force else None
         cmd = ['box', 'add', name, url, force_opt]
         if provider is not None:
@@ -633,7 +810,7 @@ class Vagrant(object):
         self._call_vagrant_command(cmd)
 
     def box_list(self):
-        '''
+        """
         Run `vagrant box list --machine-readable` and return a list of Box
         objects containing the results.  A Box object has the following
         attributes:
@@ -661,60 +838,74 @@ class Vagrant(object):
 
         Note that the box information iterates within the same blank target
         value (the 2nd column).
-        '''
+
+        :return: List of Box
+        :rtype: ``List`` of ``Box``
+        """
         # machine-readable output are CSV lines
         output = self._run_vagrant_command(['box', 'list', '--machine-readable'])
         return self._parse_box_list(output)
 
     def package(self, vm_name=None, base=None, output=None, vagrantfile=None):
-        '''
+        """
         Packages a running vagrant environment into a box.
 
-        vm_name=None: name of VM.
-        base=None: name of a VM in virtualbox to package as a base box
-        output=None: name of the file to output
-        vagrantfile=None: Vagrantfile to package with this box
-        '''
+        :keyword vm_name: required in a Multi-VM Vagrant environment.  This name will be
+        used to get the configuration for the named vm and associate the config
+        with the vm name in the cache.
+        :type vm_name: ``str``
+
+        :keyword base: name of a VM in virtualbox to package as a base box
+        :type base: ``str``
+
+        :keyword output: name of the file to output
+        :type output: ``str``
+
+        :keyword vagrantfile: Vagrantfile to package with this box
+        :type vagrantfile: ``str``
+        """
         cmd = ['package', vm_name]
         if output is not None:
             cmd += ['--output', output]
         if vagrantfile is not None:
             cmd += ['--vagrantfile', vagrantfile]
+        if base:
+            raise NotImplementedError('vagrant package --base')
 
         self._call_vagrant_command(cmd)
 
     def snapshot_push(self):
-        '''
+        """
         This takes a snapshot and pushes it onto the snapshot stack.
-        '''
+        """
         self._call_vagrant_command(['snapshot', 'push'])
 
     def snapshot_pop(self):
-        '''
+        """
         This command is the inverse of vagrant snapshot push: it will restore the pushed state.
-        '''
+        """
         NO_SNAPSHOTS_PUSHED = 'No pushed snapshot found!'
         output = self._run_vagrant_command(['snapshot', 'pop'])
         if NO_SNAPSHOTS_PUSHED in output:
             raise RuntimeError(NO_SNAPSHOTS_PUSHED)
 
     def snapshot_save(self, name):
-        '''
+        """
         This command saves a new named snapshot.
         If this command is used, the push and pop subcommands cannot be safely used.
-        '''
+        """
         self._call_vagrant_command(['snapshot', 'save', name])
 
     def snapshot_restore(self, name):
-        '''
+        """
         This command restores the named snapshot.
-        '''
+        """
         self._call_vagrant_command(['snapshot', 'restore', name])
 
     def snapshot_list(self):
-        '''
+        """
         This command will list all the snapshots taken.
-        '''
+        """
         NO_SNAPSHOTS_TAKEN = 'No snapshots have been taken yet!'
         output = self._run_vagrant_command(['snapshot', 'list'])
         if NO_SNAPSHOTS_TAKEN in output:
@@ -723,15 +914,24 @@ class Vagrant(object):
             return output.splitlines()
 
     def snapshot_delete(self, name):
-        '''
+        """
         This command will delete the named snapshot.
-        '''
+
+        :keyword name: name of snapshot
+        :type name: ``str``
+        """
         self._call_vagrant_command(['snapshot', 'delete', name])
 
     def _parse_box_list(self, output):
-        '''
+        """
         Remove Vagrant usage for unit testing
-        '''
+
+        :keyword output: content to parse
+        :type output: ``str``
+
+        :return: List of Box
+        :rtype: ``List`` of ``Box``
+        """
         # Parse box list output
         # Cue snarky comment about how nice it would be if vagrant used JSON
         # or even had a description of the machine readable output for each
@@ -747,7 +947,7 @@ class Vagrant(object):
                     boxes.append(Box(name=name, provider=provider, version=version))
 
                 # start a new box
-                name = data # box name
+                name = data  # box name
                 provider = version = None
             elif kind == 'box-provider':
                 provider = data
@@ -761,21 +961,33 @@ class Vagrant(object):
         return boxes
 
     def box_update(self, name, provider):
-        '''
+        """
         Updates the box matching name and provider. It is an error if no box
         matches name and provider.
-        '''
+
+        :keyword provider: Select box name
+        :type provider: ``str``
+
+        :keyword provider: Select box provider
+        :type provider: ``str``
+        """
         self._call_vagrant_command(['box', 'update', name, provider])
 
     def box_remove(self, name, provider):
-        '''
+        """
         Removes the box matching name and provider. It is an error if no box
         matches name and provider.
-        '''
+
+        :keyword name: Select machine with a name
+        :type name: ``str``
+
+        :keyword provider: Select machine with a specific provider
+        :type provider: ``str``
+        """
         self._call_vagrant_command(['box', 'remove', name, provider])
 
     def plugin_list(self):
-        '''
+        """
         Return a list of Plugin objects containing the following information
         about installed plugins:
 
@@ -806,14 +1018,23 @@ class Vagrant(object):
         an empty target name and sometimes with the plugin name as the target
         name.  Note also that a plugin version can be like '0.0.16' or 
         '1.1.3, system'.
-        '''
+
+        :return: List of plugins
+        :rtype: ``List`` of ``Plugin``
+        """
         output = self._run_vagrant_command(['plugin', 'list', '--machine-readable'])
         return self._parse_plugin_list(output)
 
     def _parse_plugin_list(self, output):
-        '''
+        """
         Remove Vagrant from the equation for unit testing.
-        '''
+
+        :keyword output: content to parse
+        :type output: ``str``
+
+        :return: List of plugins
+        :rtype: ``List`` of ``Plugin``
+        """
         ENCODED_COMMA = '%!(VAGRANT_COMMA)'
 
         plugins = []
@@ -828,7 +1049,7 @@ class Vagrant(object):
                     plugins.append(Plugin(name=name, version=version, system=system))
 
                 # start a new plugin
-                name = data # plugin name
+                name = data  # plugin name
                 version = None
                 system = False
             elif kind == 'plugin-version':
@@ -846,13 +1067,7 @@ class Vagrant(object):
         return plugins
 
     def _parse_machine_readable_output(self, output):
-        '''
-        param output: a string containing the output of a vagrant command with the `--machine-readable` option.
-
-        returns: a dict mapping each 'target' in the machine readable output to
-        a dict.  The dict of each target, maps each target line type/kind to
-        its data.
-
+        """
         Machine-readable output is a collection of CSV lines in the format:
 
            timestamp, target, kind, data
@@ -860,7 +1075,15 @@ class Vagrant(object):
         Target is a VM name, possibly 'default', or ''.  The empty string
         denotes information not specific to a particular VM, such as the
         results of `vagrant box list`.
-        '''
+
+        :keyword output: a string containing the output of a vagrant command with the `--machine-readable` option.
+        :type output: ``str``
+
+        :return: a dict mapping each 'target' in the machine readable output to
+        a dict.  The dict of each target, maps each target line type/kind to
+        its data.
+        :rtype: ``dict``
+        """
         # each line is a tuple of (timestamp, target, type, data)
         # target is the VM name
         # type is the type of data, e.g. 'provider-name', 'box-version'
@@ -873,7 +1096,7 @@ class Vagrant(object):
         return parsed_lines
 
     def _parse_config(self, ssh_config):
-        '''
+        """
         This lame parser does not parse the full grammar of an ssh config
         file.  It makes assumptions that are (hopefully) correct for the output
         of `vagrant ssh-config [vm-name]`.  Specifically it assumes that there
@@ -894,7 +1117,13 @@ class Vagrant(object):
 
         See https://github.com/bitprophet/ssh/blob/master/ssh/config.py for a
         more compliant ssh config file parser.
-        '''
+
+        :keyword ssh_config: contents of ssh_config
+        :type ssh_config: ``str``
+
+        :return: Parsed output of ssh config
+        :rtype: ``dict``
+        """
         conf = dict()
         started_parsing = False
         for line in ssh_config.splitlines():
@@ -908,6 +1137,15 @@ class Vagrant(object):
         return conf
 
     def _make_vagrant_command(self, args):
+        """
+        Create a list for a vagrant command
+
+        :keyword args: A sequence of arguments to a vagrant command line.
+        :type args: `List` of `str`
+
+        :return: Vagrant command list, like: ['/usr/bin/vagrant', '--version']
+        :rtype: ``List``
+        """
         if self._vagrant_exe is None:
             self._vagrant_exe = get_vagrant_executable()
 
@@ -920,11 +1158,12 @@ class Vagrant(object):
         return [self._vagrant_exe] + [arg for arg in args if arg is not None]
 
     def _call_vagrant_command(self, args):
-        '''
-        Run a vagrant command.  Return None.
-        args: A sequence of arguments to a vagrant command line.
+        """
+        Run a vagrant command.  Return None. Outputs to `out_cm` and `err_cm`.
 
-        '''
+        :keyword args: A sequence of arguments to a vagrant command line.
+        :type args: `List` of `str`
+        """
         # Make subprocess command
         command = self._make_vagrant_command(args)
         with self.out_cm() as out_fh, self.err_cm() as err_fh:
@@ -932,56 +1171,89 @@ class Vagrant(object):
                                   stderr=err_fh, env=self.env)
 
     def _run_vagrant_command(self, args):
-        '''
+        """
         Run a vagrant command and return its stdout.
-        args: A sequence of arguments to a vagrant command line.
-        e.g. ['up', 'my_vm_name', '--no-provision'] or
+
+        args: e.g. ['up', 'my_vm_name', '--no-provision'] or
         ['up', None, '--no-provision'] for a non-Multi-VM environment.
-        '''
+
+        :keyword args: A sequence of arguments to a vagrant command line.
+        :type args: `List` of `str`
+
+        :return: Output of vagrant command. Errors output to `err_cm`.
+        :rtype: ``str``
+        """
         # Make subprocess command
         command = self._make_vagrant_command(args)
         with self.err_cm() as err_fh:
             return compat.decode(subprocess.check_output(command, cwd=self.root,
-                                               env=self.env, stderr=err_fh))
+                                                         env=self.env, stderr=err_fh))
 
 
 class SandboxVagrant(Vagrant):
-    '''
+    """
     Support for sandbox mode using the Sahara gem (https://github.com/jedi4ever/sahara).
-    '''
+    """
 
     def _run_sandbox_command(self, args):
+        """
+        :keyword args: A sequence of arguments to a vagrant command line.
+        :type args: `List` of `str`
+
+        :return: Output of `vagrant sandbox` command. Errors output to `err_cm`.
+        :rtype: ``str``
+        """
         return self._run_vagrant_command(['sandbox'] + list(args))
 
     def sandbox_commit(self, vm_name=None):
-        '''
+        """
         Permanently writes all the changes made to the VM.
-        '''
+
+        :keyword vm_name: required in a Multi-VM Vagrant environment.  This name will be
+        used to get the configuration for the named vm and associate the config
+        with the vm name in the cache.
+        :type vm_name: ``str``
+        """
         self._run_sandbox_command(['commit', vm_name])
 
     def sandbox_off(self, vm_name=None):
-        '''
+        """
         Disables the sandbox mode.
-        '''
+
+        :keyword vm_name: required in a Multi-VM Vagrant environment.  This name will be
+        used to get the configuration for the named vm and associate the config
+        with the vm name in the cache.
+        :type vm_name: ``str``
+        """
         self._run_sandbox_command(['off', vm_name])
 
     def sandbox_on(self, vm_name=None):
-        '''
+        """
         Enables the sandbox mode.
 
         This requires the Sahara gem to be installed
         (https://github.com/jedi4ever/sahara).
-        '''
+
+        :keyword vm_name: required in a Multi-VM Vagrant environment.  This name will be
+        used to get the configuration for the named vm and associate the config
+        with the vm name in the cache.
+        :type vm_name: ``str``
+        """
         self._run_sandbox_command(['on', vm_name])
 
     def sandbox_rollback(self, vm_name=None):
-        '''
+        """
         Reverts all the changes made to the VM since the last commit.
-        '''
+
+        :keyword vm_name: required in a Multi-VM Vagrant environment.  This name will be
+        used to get the configuration for the named vm and associate the config
+        with the vm name in the cache.
+        :type vm_name: ``str``
+        """
         self._run_sandbox_command(['rollback', vm_name])
 
     def sandbox_status(self, vm_name=None):
-        '''
+        """
         Returns the status of the sandbox mode.
 
         Possible values are:
@@ -989,20 +1261,35 @@ class SandboxVagrant(Vagrant):
         - off
         - unknown
         - not installed
-        '''
+
+        :keyword vm_name: required in a Multi-VM Vagrant environment.  This name will be
+        used to get the configuration for the named vm and associate the config
+        with the vm name in the cache.
+        :type vm_name: ``str``
+
+        :return: Parsed output of `vagrant sandbox status`
+        :rtype: ``str``
+        """
         vagrant_sandbox_output = self._run_sandbox_command(['status', vm_name])
         return self._parse_vagrant_sandbox_status(vagrant_sandbox_output)
 
     def _parse_vagrant_sandbox_status(self, vagrant_output):
-        '''
+        """
         Returns the status of the sandbox mode given output from
         'vagrant sandbox status'.
-        '''
-        # typical output
-        # [default] - snapshot mode is off
-        # or
-        # [default] - machine not created
-        # if the box VM is down
+
+        typical output
+        [default] - snapshot mode is off
+        or
+        [default] - machine not created
+        if the box VM is down
+
+        :keyword vagrant_output: content to parse
+        :type vagrant_output: ``str``
+
+        :return: Parsed output of `vagrant sandbox status`
+        :rtype: ``str``
+        """
         tokens = [token.strip() for token in vagrant_output.split(' ')]
         if tokens[0] == 'Usage:':
             sahara_status = 'not installed'

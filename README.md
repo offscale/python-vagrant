@@ -221,5 +221,3 @@ output is sent -- console or devnull:
     ... v4 = vagrant.Vagrant(vagrantfile, out_cm=vagrant.devnull_cm)
     >>> v4.destroy() # output to console
     >>> 
-
-
