@@ -21,6 +21,8 @@ import sys
 import logging
 
 # local
+from cStringIO import StringIO
+
 from . import compat
 
 # python package version
@@ -152,6 +154,7 @@ if get_vagrant_executable() is None:
 Status = collections.namedtuple('Status', ['name', 'state', 'provider'])
 Box = collections.namedtuple('Box', ['name', 'provider', 'version'])
 Plugin = collections.namedtuple('Plugin', ['name', 'version', 'system'])
+GlobalStatus = collections.namedtuple('GlobalStatus', ['directory', 'id', 'name', 'provider', 'state'])
 
 
 #########################################################################
@@ -579,10 +582,10 @@ class Vagrant(object):
         Unit testing is so much easier when Vagrant is removed from the
         equation.
 
-        :keyword output: content to parse
+        :keyword output: a string containing the output of: `vagrant status --machine-readable`.
         :type output: ``str``
 
-        :return: Parsed output of `vagrant status --machine-readable`
+        :return: Parsed output
         :rtype: ``List`` of ``Status``
         """
         parsed = self._parse_machine_readable_output(output)
@@ -926,7 +929,7 @@ class Vagrant(object):
         """
         Remove Vagrant usage for unit testing
 
-        :keyword output: content to parse
+        :keyword output: a string containing the output of: `vagrant box list --machine-readable`.
         :type output: ``str``
 
         :return: List of Box
@@ -1025,11 +1028,65 @@ class Vagrant(object):
         output = self._run_vagrant_command(['plugin', 'list', '--machine-readable'])
         return self._parse_plugin_list(output)
 
+    def global_status(self):
+        """
+        Return a list of GlobalStatus objects containing the following information
+        about installed plugins:
+
+        - directory: The Vagrantfile directory, as a string.
+        - id: The Vagrant ID, as a string.
+        - name: The name, as a string
+        - provider: The provider, as a string
+        - state: The state, as a string
+
+        Example output:
+
+            [GlobalStatus(id='e850cc7', name='default', provider='virtualbox', state='running', directory='/fullstack'),
+             GlobalStatus(id='9cc31c9', name='default', provider='virtualbox', state='running', directory='/tmp/vat')]
+
+        Implementation Details:
+
+        Example output of `vagrant plugin list --machine-readable`:
+
+            $ vagrant global-status --machine-readable1481892246,,ui,info,id
+            1481892246,,ui,info,name
+            1481892246,,ui,info,provider
+            1481892246,,ui,info,state
+            1481892246,,ui,info,directory
+            1481892246,,ui,info,
+            1481892246,,ui,info,---------------------------------------------------------------------------
+            1481892246,,ui,info,e850cc7
+            1481892246,,ui,info,default
+            1481892246,,ui,info,virtualbox
+            1481892246,,ui,info,running
+            1481892246,,ui,info,/fullstack
+            1481892246,,ui,info,
+            1481892246,,ui,info,9cc31c9
+            1481892246,,ui,info,default
+            1481892246,,ui,info,virtualbox
+            1481892246,,ui,info,running
+            1481892246,,ui,info,/tmp/vat
+            1481892246,,ui,info,
+            1481892246,,ui,info, \nThe above shows information about all known Vagrant environments\non this machine.\
+                                This data is cached and may not be completely\nup-to-date. To interact with any of  \
+                                the machines%!(VAGRANT_COMMA) you can go to\nthat directory and \
+                                run Vagrant%!(VAGRANT_COMMA) or you can use the ID directly\nwith Vagrant commands \
+                                from any directory. For example:\n"vagrant destroy 1a2b3c4d"
+
+        Note that the information for each plugin seems grouped within
+        consecutive lines.  That information is also associated sometimes with
+        an empty name.
+
+        :return: List of global statuses
+        :rtype: ``List`` of ``GlobalStatus``
+        """
+        return self._parse_global_status(self._run_vagrant_command(['global-status', '--machine-readable']))
+
     def _parse_plugin_list(self, output):
         """
         Remove Vagrant from the equation for unit testing.
 
-        :keyword output: content to parse
+        :keyword output: a string containing the output of: `vagrant plugin list --machine-readable`.
         :type output: ``str``
 
         :return: List of plugins
@@ -1135,6 +1192,26 @@ class Vagrant(object):
             # Remove leading and trailing " from the values
             conf[key] = value.strip('"')
         return conf
+
+    def _parse_global_status(self, output):
+        """
+        Parse global status output
+
+        :keyword output: a string or IO containing the output of: `vagrant global-status --machine-readable`.
+        :type output: ``str`` or ``IO`` (e.g.: ``StringIO``, ``stdin``)
+
+        :return: List of global statuses
+        :rtype: ``List`` of ``GlobalStatus``
+        """
+        io = StringIO(output) if isinstance(output, basestring) else output
+
+        return (lambda get_last_col: (
+            lambda headers: tuple(
+                itertools.imap(lambda a: GlobalStatus(*a), itertools.izip_longest(
+                    *[(itertools.ifilter(lambda r: r is not None and not r.endswith('\\n"vagrant destroy 1a2b3c4d'),
+                                         itertools.imap(get_last_col, io)))] * len(headers)))))(
+            tuple(itertools.ifilter(None, itertools.imap(get_last_col, itertools.takewhile(lambda c: c[-5] != '-', io)))
+                  )))(lambda row: (lambda r: r if r else None)(row[row.rfind(',') + 1:-2].rstrip()))
 
     def _make_vagrant_command(self, args):
         """
